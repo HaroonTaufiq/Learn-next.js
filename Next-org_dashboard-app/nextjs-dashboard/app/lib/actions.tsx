@@ -26,112 +26,73 @@ const UpdateInvoice = FormSchema.omit({ id: true, date: true });
 
 export type State = {
   errors?: {
-    customerId?: string[];
-    amount?: string[];
-    status?: string[];
+    customerId?: string;
+    amount?: string;
+    status?: string;
   };
-  message?: string | null;
+  message?: string;
 };
 
-export async function createInvoice(prevState: State, formData: FormData) {
-  // Validate form using Zod
-  const validatedFields = CreateInvoice.safeParse({
-    customerId: formData.get('customerId'),
-    amount: formData.get('amount'),
-    status: formData.get('status'),
-  });
- 
-  // If form validation fails, return errors early. Otherwise, continue.
-  if (!validatedFields.success) {
-    return {
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Missing Fields. Failed to Create Invoice.',
-    };
-  }
- 
-  // Prepare data for insertion into the database
-  const { customerId, amount, status } = validatedFields.data;
-  const amountInCents = amount * 100;
-  const date = new Date().toISOString().split('T')[0];
- 
-  // Insert data into the database
+export async function createInvoice(formData: FormData) {
   try {
+    const { customerId, amount, status } = CreateInvoice.parse({
+      customerId: formData.get('customerId'),
+      amount: formData.get('amount'),
+      status: formData.get('status'),
+    });
+    const amountInCents = amount * 100;
+    const date = new Date().toISOString().split('T')[0];
+
     await sql`
-      INSERT INTO invoices (customer_id, amount, status, date)
-      VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
+    INSERT INTO invoices (customer_id, amount, status, date)
+    VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
     `;
-  } catch (error) {
-    // If a database error occurs, return a more specific error.
-    return {
-      message: 'Database Error: Failed to Create Invoice.',
-    };
+
+    revalidatePath('/dashboard/invoices');
+    redirect('/dashboard/invoices');
+  } catch (err) {
+    console.error(err); // Utilize the error variable
   }
- 
-  // Revalidate the cache for the invoices page and redirect the user.
-  revalidatePath('/dashboard/invoices');
-  redirect('/dashboard/invoices');
 }
 
-export async function updateInvoice(
-  id: string,
-  prevState: State,
-  formData: FormData,
-) {
-  const validatedFields = UpdateInvoice.safeParse({
-    customerId: formData.get('customerId'),
-    amount: formData.get('amount'),
-    status: formData.get('status'),
-  });
- 
-  if (!validatedFields.success) {
-    return {
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Missing Fields. Failed to Update Invoice.',
-    };
-  }
- 
-  const { customerId, amount, status } = validatedFields.data;
-  const amountInCents = amount * 100;
- 
+export async function updateInvoice(id: string, formData: FormData) {
   try {
+    const { customerId, amount, status } = UpdateInvoice.parse({
+      customerId: formData.get('customerId'),
+      amount: formData.get('amount'),
+      status: formData.get('status'),
+    });
+
+    const amountInCents = amount * 100;
+
     await sql`
       UPDATE invoices
       SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}
       WHERE id = ${id}
     `;
-  } catch (error) {
-    return { message: 'Database Error: Failed to Update Invoice.' };
-  }
- 
-  revalidatePath('/dashboard/invoices');
-  redirect('/dashboard/invoices');
-}
 
-export async function deleteInvoice(id: string) {
-  try {
-    await sql`DELETE FROM invoices WHERE id = ${id}`;
     revalidatePath('/dashboard/invoices');
-    return { message: 'Deleted Invoice.' };
-  } catch (error) {
-    return { message: 'Database Error: Failed to Delete Invoice.' };
+    redirect('/dashboard/invoices');
+  } catch (err) {
+    console.error(err); // Utilize the error variable
   }
 }
 
-export async function authenticate(
-  prevState: string | undefined,
-  formData: FormData,
-) {
+export async function signInUser(credentials: { email: string; password: string }) {
   try {
-    await signIn('credentials', formData);
-  } catch (error) {
-    if (error instanceof AuthError) {
-      switch (error.type) {
-        case 'CredentialsSignin':
-          return 'Invalid credentials.';
-        default:
-          return 'Something went wrong.';
-      }
+    const result = await signIn('credentials', {
+      redirect: false,
+      email: credentials.email,
+      password: credentials.password,
+    });
+
+    if (result?.error) {
+      throw new AuthError(result.error);
     }
-    throw error;
+
+    revalidatePath('/');
+    redirect('/');
+  } catch (err) {
+    console.error(err); // Utilize the error variable
   }
 }
