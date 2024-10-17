@@ -4,16 +4,20 @@ import { fetchInvoiceById, fetchCustomers } from '@/app/lib/data';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 
-export default async function Page({ params }: { params: { id: string } }) {
-    const id = params.id;
-    const [invoice, customers] = await Promise.all([
-        fetchInvoiceById(id),
-        fetchCustomers(),
-      ]);
+export const metadata: Metadata = {
+  title: 'Edit Invoice',
+};
 
-      if (!invoice) {
-        notFound();
-      }
+export default async function Page({ params }: { params: { id: string } }) {
+  const id = params.id;
+  const [invoice, customers] = await Promise.all([
+    fetchInvoiceById(id),
+    fetchCustomers(),
+  ]);
+
+  if (!invoice) {
+    notFound();
+  }
 
   return (
     <main>
@@ -31,7 +35,3 @@ export default async function Page({ params }: { params: { id: string } }) {
     </main>
   );
 }
-
-export const metadata: Metadata = {
-    title: 'Invoices',
-  };
